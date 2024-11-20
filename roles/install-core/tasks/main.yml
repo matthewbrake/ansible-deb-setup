@@ -1,0 +1,108 @@
+---
+- name: Install Basic System Utilities
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install Essential Utilities
+      apt:
+        name:
+          - git
+          - nano
+          - wget
+          - curl
+          - build-essential
+          - busybox
+          - iptables
+          - ufw
+          - gparted
+          - parted
+          - ntfs-3g
+        state: present
+      tags: utilities
+
+    - name: Install File Sharing Utilities
+      apt:
+        name:
+          - samba
+          - smbclient
+          - nfs-common
+        state: present
+      tags: file_sharing
+
+    - name: Install Security Utilities
+      apt:
+        name:
+          - openssl
+          - openssh-client
+          - ca-certificates
+        state: present
+      tags: security
+
+    - name: Install Development Tools
+      apt:
+        name:
+          - software-properties-common
+          - vim
+          - tree
+          - htop
+          - zip
+          - unzip
+          - nano
+          - gedit
+          - git
+          - net-tools
+          - dnsutils
+          - traceroute
+          - rsync
+          - lsof
+          - tcpdump
+          - iproute2
+          - tar
+          - gzip
+          - bzip2
+          - make
+          - gcc
+          - g++
+          - gdb
+        state: present
+      tags: development
+
+    - name: Install Python and Java
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - perl
+          - default-jre
+          - default-jdk
+        state: present
+      tags: python_java
+
+    - name: Install System Monitoring Utilities
+      apt:
+        name:
+          - preload
+          - zram-config
+          - gnome-disk-utility
+        state: present
+      tags: system_monitoring
+
+    - name: Install Intel IoT Tools and Linux Tools
+      apt:
+        name:
+          - linux-intel-iotg-tools-common
+          - linux-tools-common
+        state: present
+      tags: iot_linux_tools
+
+    - name: Install Network Utilities
+      apt:
+        name:
+          - net-tools
+          - ifconfig
+          - unattended-upgrades
+          - apt-listchanges
+          - network-manager
+        state: present
+      tags: network
