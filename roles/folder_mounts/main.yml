@@ -1,0 +1,30 @@
+---
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: user
+    mode: '0775'
+  loop:
+    - /mnt/fs-omv
+    - /mnt/zima
+    - /mnt/zima/sftp/sonicbit
+    - /mnt/zima/gdrive-mbrake1994
+    - /mnt/zima/HDD
+    - /docker
+    - /HDD
+
+- name: Add mount entries to fstab
+  lineinfile:
+    path: /etc/fstab
+    line: "{{ item }}"
+    state: present
+  loop:
+    - "//10.0.0.53/fs-omv /mnt/fs-omv cifs username=user,password=password,uid=1000,gid=1000,nofail 0 0"
+    - "//10.0.0.150/HDD2 /mnt/zima/HDD cifs username=user,password=password,uid=1000,gid=1000,nofail 0 0"
+    - "//10.0.0.150/zima_sftp_sonicbit /mnt/zima/sonicbit-sftp cifs username=user,password=password,uid=1000,gid=1000,nofail 0 0"
+    - "//10.0.0.150/zima_gdrive_mbrake1994 /mnt/zima/gdrive-mbrake1994 cifs username=user,password=password,uid=1000,gid=1000,nofail 0 0"
+
+- name: Mount all entries in fstab
+  command: mount -a
