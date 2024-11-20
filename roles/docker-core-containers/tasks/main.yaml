@@ -1,0 +1,42 @@
+- name: Deploy Core Services Containers
+  block:
+    # Portainer CE
+    - name: Create Portainer volume
+      community.docker.docker_volume:
+        name: portainer-data
+
+    - name: Deploy Portainer CE
+      community.docker.docker_container:
+        name: portainer
+        image: "docker.io/portainer/portainer-ce"
+        ports:
+          - "9443:9443"
+        volumes:
+          - /run/docker.sock:/var/run/docker.sock
+          - portainer-data:/data
+        restart_policy: unless-stopped
+
+    # Watchtower
+    - name: Deploy Watchtower
+      community.docker.docker_container:
+        name: watchtower
+        image: "containrrr/watchtower:latest"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+          WATCHTOWER_CLEANUP: "true"
+          WATCHTOWER_INCLUDE_STOPPED: "true"
+          WATCHTOWER_POLL_INTERVAL: "30000"
+          WATCHTOWER_REVIVE_STOPPED: "false"
+        restart_policy: unless-stopped
+
+    # Netdata
+    - name: Create Netdata volumes
+      community.docker.docker_volume:
+        name: "{{ item }}"
+      loop:
+        - netdataconfig
+        - netdatalib
+        - netdatacache
+
+    - name
