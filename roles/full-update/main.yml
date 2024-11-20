@@ -1,0 +1,41 @@
+---
+- name: Comprehensive System Maintenance Playbook
+  hosts: all
+  become: yes
+  become_method: sudo
+  become_user: root
+  tasks:
+    - name: Update apt package cache and upgrade system
+      apt:
+        update_cache: yes
+        upgrade: full
+        autoremove: yes
+        autoclean: yes
+        install_recommends: yes
+      register: apt_result
+
+    - name: Fix broken packages if any
+      command: apt --fix-broken install
+      register: fix_broken
+      changed_when: "'0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.' not in fix_broken.stdout"
+      when: apt_result.changed
+
+    - name: Clean apt cache and configure packages
+      shell: |
+        apt-get clean
+        dpkg --configure -a
+      changed_when: false
+
+    - name: Update grub
+      command: update-grub
+      changed_when: false
+
+    - name: Check if reboot is required
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+  handlers:
+    - name: Reboot system
+      reboot:
+      when: reboot_required.stat.exists or apt_result.changed or fix_broken.changed
