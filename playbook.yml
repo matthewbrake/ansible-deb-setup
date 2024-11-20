@@ -1,8 +1,11 @@
 ---
-- hosts: servers
-  become: true
+- name: Debian Server Setup
+  hosts: all
+  become: yes
+  become_user: root
+
   roles:
     - users
-    - ssh
     - folders_mounts
+    - ssh
     - docker
