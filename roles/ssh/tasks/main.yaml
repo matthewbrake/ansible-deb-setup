@@ -1,0 +1,32 @@
+---
+- name: Install SSH server
+  apt:
+    name: openssh-server
+    state: present
+    update_cache: yes
+
+- name: Configure SSH for X11 Forwarding
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?X11Forwarding'
+    line: 'X11Forwarding yes'
+
+- name: Allow root login via SSH
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin yes'
+
+- name: Set up SSH keys for users
+  authorized_key:
+    user: "{{ item }}"
+    key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCyUFXWCropvytbMVP6JNpm2zsdz5MOMYe3MaMNXbxYwdGemjcCeoQlnnhe3CbmDrKNZnkc/hPs9mwUsS6FijSdnXaC4+FELpPXMkRXw9b3KCAJc7xcOIJACTEp5gVdbHzBefWx8+sVqs7iRjwd8n5K9laPOjr4lyj7YC5tY4JzIHzjQBtrx2ZcvTFyzzy3SdapVm1+drBYUweh4BY6ANrDuQAJeYzUPYfWB6vPtSzE3hRbbkJ71SPJFB1aBNGbJbdM65f6VJ/BbMaOZKjE7zPk4VuHabhVAE7kKp6HUwWoVIwxCzUa3goT8gFvWlZXsyn3IM72Y5nyXoDMYu40+v6d rsa-key-20240325"
+  loop:
+    - user
+    - ssh
+    - root
+
+- name: Restart SSH service
+  service:
+    name: ssh
+    state: restarted
