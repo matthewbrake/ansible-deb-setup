@@ -1,0 +1,94 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Install xrdp and xorgxrdp
+      apt:
+        name: [xrdp, xorgxrdp]
+        state: present
+
+    - name: Create RDP user
+      user:
+        name: rdp
+        shell: /bin/bash
+        password: "password"  # In a production environment, use a more secure method for password management
+        state: present
+
+    - name: Add RDP user to groups
+      user:
+        name: rdp
+        groups: sudo,ssl-cert
+        append: yes
+
+    - name: Create .xsession file with detected desktop environment
+      block:
+        - name: Detect GNOME
+          command: command -v gnome-session
+          register: gnome_result
+          changed_when: false
+          ignore_errors: true
+
+        - name: Detect Cinnamon
+          command: command -v cinnamon-session-cinnamon
+          register: cinnamon_result
+          changed_when: false
+          ignore_errors: true
+
+        - name: Detect XFCE
+          command: command -v startxfce4
+          register: xfce_result
+          changed_when: false
+          ignore_errors: true
+
+        - name: Detect KDE
+          command: command -v startkde
+          register: kde_result
+          changed_when: false
+          ignore_errors: true
+
+        - name: Detect LXDE
+          command: command -v lxsession
+          register: lxde_result
+          changed_when: false
+          ignore_errors: true
+
+        - name: Set desktop_env fact based on detected environment
+          set_fact:
+            desktop_env: "{{ 'gnome-session' if gnome_result.rc == 0 else 
+                             'cinnamon-session-cinnamon' if cinnamon_result.rc == 0 else
+                             'startxfce4' if xfce_result.rc == 0 else
+                             'startkde' if kde_result.rc == 0 else
+                             'lxsession' if lxde_result.rc == 0 else
+                             'unknown' }}"
+
+        - name: Fail if no supported desktop environment is found
+          fail:
+            msg: "No compatible desktop environment found."
+          when: desktop_env == 'unknown'
+
+        - name: Create .xsession file
+          copy:
+            content: "{{ desktop_env }}"
+            dest: /home/rdp/.xsession
+            owner: rdp
+            group: rdp
+            mode: 0600
+
+    - name: Allow port 3389 in firewall
+      ufw:
+        rule: allow
+        port: 3389
+        proto: tcp
+
+    - name: Restart and enable xrdp service
+      service:
+        name: xrdp
+        state: restarted
+        enabled: yes
+
+    - name: Set lockscreen to never (Cinnamon specific)
+      command: gsettings set org.cinnamon.desktop.session idle-delay 0
+      when: cinnamon_result.rc == 0  # Only run if Cinnamon is detected
+
+    - name: Verify xrdp service status
+      command: systemctl status xrdp
