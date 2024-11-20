@@ -1,0 +1,56 @@
+- name: Setup Docker and related configurations
+  block:
+    - name: Install Docker using convenience script
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Execute Docker installation script
+      command: sh /tmp/get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Ensure Docker service is enabled and started
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Docker Compose
+      pip:
+        name: docker-compose
+        state: latest
+  
+    - name: Create Docker daemon configuration directory
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Create Docker daemon configuration file
+      copy:
+        content: |
+          {
+            "data-root": "/var/lib/docker",
+            "log-driver": "json-file",
+            "log-opts": {"max-size": "10m", "max-file": "3"}
+          }
+        dest: /etc/docker/daemon.json
+        mode: '0644'
+
+    - name: Restart Docker service to apply new configuration
+      systemd:
+        name: docker
+        state: restarted
+
+    - name: Add users to Docker group
+      user:
+        name: "{{ item }}"
+        groups: docker
+        append: yes
+      loop:
+        - user
+        - rdp
+
+  become: yes
