@@ -1,43 +1,105 @@
----
-- name: Create user group
-  group:
-    name: user
-    state: present
+- name: Set up users and permissions
+  block:
+    # Create the primary user group
+    - name: Create user group
+      group:
+        name: user
+        state: present
 
-- name: Create users
-  user:
-    name: "{{ item }}"
-    groups: user,sudo,docker
-    shell: /bin/bash
-  loop:
-    - user
-    - ssh
-    - rdp
+    # Create users with specified groups and shell
+    - name: Create users
+      user:
+        name: "{{ item }}"
+        groups: root,sudo,docker,users
+        group: user
+        shell: /bin/bash
+      loop:
+        - user
+        - ssh
+        - rdp
 
-- name: Set password for users
-  command: echo "{{ item }}:password" | chpasswd
-  loop:
-    - user
-    - ssh
-    - rdp
+    # Set password for all users
+    - name: Set password for users
+      command: echo "{{ item }}:password" | chpasswd
+      loop:
+        - user
+        - ssh
+        - rdp
+        - root
 
-- name: Set permissions for home directories
-  file:
-    path: "/home/{{ item }}"
-    owner: "{{ item }}"
-    group: user
-    mode: '0775'
-    recurse: yes
-  loop:
-    - user
-    - ssh
-    - rdp
+    # Set permissions for home directories
+    - name: Set permissions for home directories
+      file:
+        path: "/home/{{ item }}"
+        owner: "{{ item }}"
+        group: user
+        mode: '0775'
+        recurse: yes
+      loop:
+        - user
+        - ssh
+        - rdp
 
-- name: Set setgid bit on home directories
-  file:
-    path: "/home/{{ item }}"
-    mode: g+s
-  loop:
-    - user
-    - ssh
-    - rdp
+    # Set setgid bit on home directories to ensure new files inherit group ownership
+    - name: Set setgid bit on home directories
+      file:
+        path: "/home/{{ item }}"
+        mode: g+s
+      loop:
+        - user
+        - ssh
+        - rdp
+
+    # Create sudoers file for user
+    - name: Create sudoers file for user
+      copy:
+        content: 'user ALL=(ALL) NOPASSWD: ALL'
+        dest: /etc/sudoers.d/sudoer_user
+        mode: '0440'
+
+    # Add 'cd ~' to bashrc files
+    - name: Add 'cd ~' to bashrc files
+      lineinfile:
+        path: "{{ item }}"
+        line: 'cd ~'
+      loop:
+        - /home/user/.bashrc
+        - /home/ssh/.bashrc
+        - /root/.bashrc
+
+    # Modify root's PS1 in bashrc
+    - name: Modify root's PS1 in bashrc
+      lineinfile:
+        path: /root/.bashrc
+        regexp: '^PS1='
+        line: 'PS1="\u@\h:\w# "'
+
+    # Ensure new files inherit group permissions
+    - name: Set default ACL for group permissions
+      acl:
+        path: "/home/{{ item }}"
+        entity: group
+        etype: group
+        permissions: rwx
+        default: yes
+        state: present
+      loop:
+        - user
+        - ssh
+        - rdp
+
+    # Ensure new files inherit other permissions
+    - name: Set default ACL for other permissions
+      acl:
+        path: "/home/{{ item }}"
+        entity: other
+        etype: other
+        permissions: rx
+        default: yes
+        state: present
+      loop:
+        - user
+        - ssh
+        - rdp
+
+  become: yes
