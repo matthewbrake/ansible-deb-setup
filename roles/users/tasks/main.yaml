@@ -1,0 +1,43 @@
+---
+- name: Create user group
+  group:
+    name: user
+    state: present
+
+- name: Create users
+  user:
+    name: "{{ item }}"
+    groups: user,sudo,docker
+    shell: /bin/bash
+  loop:
+    - user
+    - ssh
+    - rdp
+
+- name: Set password for users
+  command: echo "{{ item }}:password" | chpasswd
+  loop:
+    - user
+    - ssh
+    - rdp
+
+- name: Set permissions for home directories
+  file:
+    path: "/home/{{ item }}"
+    owner: "{{ item }}"
+    group: user
+    mode: '0775'
+    recurse: yes
+  loop:
+    - user
+    - ssh
+    - rdp
+
+- name: Set setgid bit on home directories
+  file:
+    path: "/home/{{ item }}"
+    mode: g+s
+  loop:
+    - user
+    - ssh
+    - rdp
