@@ -1,0 +1,99 @@
+---
+- name: Deploy Core Services Containers
+  block:
+    # Create Docker networks
+    - name: Create core_services network
+      community.docker.docker_network:
+        name: core_services
+        driver: bridge
+
+    - name: Create essentials network
+      community.docker.docker_network:
+        name: essentials
+        driver: bridge
+
+    # Deploy Portainer Agent
+    - name: Deploy Portainer Agent
+      community.docker.docker_container:
+        name: portainer_agent
+        image: portainer/agent:latest
+        restart_policy: always
+        ports:
+          - "9001:9001"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - /var/lib/docker/volumes:/var/lib/docker/volumes
+        networks:
+          - essentials
+
+    # Deploy Watchtower
+    - name: Deploy Watchtower
+      community.docker.docker_container:
+        name: watchtower
+        image: containrrr/watchtower:latest
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+        environment:
+          WATCHTOWER_CLEANUP: "true"
+          WATCHTOWER_INCLUDE_STOPPED: "true"
+          WATCHTOWER_POLL_INTERVAL: "30000"
+          WATCHTOWER_REVIVE_STOPPED: "false"
+        restart_policy: unless-stopped
+        networks:
+          - core_services
+
+    # Deploy Netdata
+    - name: Deploy Netdata container
+      community.docker.docker_container:
+        name: netdata_node
+        image: netdata/netdata:latest
+        pid: host
+        cap_add:
+          - SYS_PTRACE
+          - SYS_ADMIN
+        security_opt:
+          - apparmor=unconfined
+        volumes:
+          - netdataconfig:/etc/netdata
+          - netdatalib:/var/lib/netdata
+          - netdatacache:/var/cache/netdata
+          - /etc/passwd:/host/etc/passwd:ro
+          - /etc/group:/host/etc/group:ro
+          - /etc/os-release:/host/etc/os-release:ro
+          - /proc:/host/proc:ro
+          - /sys:/host/sys:ro
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+        environment:
+          NETDATA_CLAIM_TOKEN: "wZxBq8CQ_J8UZCwbKKvXyewyZwSkAdlnCu0K83K_GEU7iEu6ytoGJQ1JsKqleeqjq80zEt583UO0i2jnnoIZ3yvTAGx0ZzzYIq47xVUI3wp1fLWvQxRSbECnSNOrZhYxjaeaxIw"
+          NETDATA_CLAIM_URL: "https://app.netdata.cloud"
+          NETDATA_CLAIM_ROOMS: "6c47f021-fce6-478d-866e-25642c69e623"
+        restart_policy: unless-stopped
+        networks:
+          - core_services
+
+    # Deploy Filebrowser container
+    - name: Deploy Filebrowser container
+      community.docker.docker_container:
+        name: filebrowser
+        image: filebrowser/filebrowser:s6
+        restart_policy: unless-stopped
+        ports:
+          - "8085:8080"
+        volumes:
+          - filebrowser_data:/config
+          - filebrowser_data:/database
+          - /:/srv  # Mounting the root filesystem as a volume (use with caution)
+        networks:
+          - core_services
+
+  # Optionally, you can add handlers here if needed.
+
+# Define Docker volumes at the end of the playbook or in a separate task.
+- name: Create Docker volumes for Netdata and Filebrowser data storage.
+  community.docker.docker_volume:
+    name: "{{ item }}"
+  loop:
+    - filebrowser_data
+    - netdataconfig
+    - netdatalib
+    - netdatacache
