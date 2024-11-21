@@ -9,3 +9,6 @@
     - folders_mounts
     - ssh
     - docker
+    - docker-core-containers
+    - xrdp
+    - webmin
