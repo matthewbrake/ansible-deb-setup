@@ -1,6 +1,4 @@
 ---
-- hosts: all
-  become: true
   tasks:
     - name: Install xrdp and xorgxrdp
       apt:
