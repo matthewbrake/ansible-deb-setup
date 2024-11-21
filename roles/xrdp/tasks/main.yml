@@ -1,15 +1,21 @@
 ---
+- name: Install and Configure XRDP
+  hosts: all
+  become: yes
   tasks:
     - name: Install xrdp and xorgxrdp
       apt:
-        name: [xrdp, xorgxrdp]
+        name:
+          - xrdp
+          - xorgxrdp
         state: present
+      when: ansible_os_family == "Debian"  # Optional: Ensure it's run on Debian-based systems
 
     - name: Create RDP user
       user:
         name: rdp
         shell: /bin/bash
-        password: "password"  # In a production environment, use a more secure method for password management
+        password: "{{ 'password' | password_hash('sha512') }}"  # Use hashed password for security
         state: present
 
     - name: Add RDP user to groups
@@ -56,7 +62,7 @@
                              'cinnamon-session-cinnamon' if cinnamon_result.rc == 0 else
                              'startxfce4' if xfce_result.rc == 0 else
                              'startkde' if kde_result.rc == 0 else
-                             'lxsession' if lxde_result.rc == 0 else
+                             'lxsession' if lxde_result.rc == 0 else 
                              'unknown' }}"
 
         - name: Fail if no supported desktop environment is found
@@ -64,19 +70,18 @@
             msg: "No compatible desktop environment found."
           when: desktop_env == 'unknown'
 
-        - name: Create .xsession file
+        - name: Create .xsession file for RDP user
           copy:
             content: "{{ desktop_env }}"
             dest: /home/rdp/.xsession
             owner: rdp
             group: rdp
-            mode: 0600
+            mode: '0600'
 
-    - name: Allow port 3389 in firewall
+    - name: Allow port 3389 in firewall (UFW)
       ufw:
         rule: allow
-        port: 3389
-        proto: tcp
+        port: 3389/tcp
 
     - name: Restart and enable xrdp service
       service:
@@ -85,8 +90,11 @@
         enabled: yes
 
     - name: Set lockscreen to never (Cinnamon specific)
-      command: gsettings set org.cinnamon.desktop.session idle-delay 0
-      when: cinnamon_result.rc == 0  # Only run if Cinnamon is detected
+      command:
+        cmd: gsettings set org.cinnamon.desktop.session idle-delay 0 
+      when:
+        - cinnamon_result.rc == 0  # Only run if Cinnamon is detected
 
     - name: Verify xrdp service status
-      command: systemctl status xrdp
+      command:
+        cmd: systemctl status xrdp --no-pager  # Use --no-pager for cleaner output 
