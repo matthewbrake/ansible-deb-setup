@@ -1,46 +1,49 @@
 #!/bin/bash
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
 
-# Script to install Visual Studio Code using the official Microsoft APT repository on Ubuntu
+# === CONFIGURATION & LOGGING ===
+LOG_DIR="/var/log/firstboot"
+LOG_FILE="$LOG_DIR/install.log"
+mkdir -p "$LOG_DIR"
 
-echo "--- Starting VS Code APT Installation ---"
+# Redirect all output to the log file and console
+exec > >(tee -a "$LOG_FILE") 2>&1
 
-# 1. Update the package list
-echo "Updating package list..."
-sudo apt update
+# Error handling function
+set -e
+trap 'echo "ERROR: Installation failed at line $LINENO. Check $LOG_FILE for details.";' ERR
 
-# 2. Install necessary packages for HTTPS transport and GPG key handling
-echo "Installing prerequisites (wget, apt-transport-https, etc.)..."
-sudo apt install -y wget gpg apt-transport-https
+echo "=== Starting Deployment: $(date) ==="
 
-# 3. Import Microsoft GPG key
-echo "Downloading and installing Microsoft's GPG key..."
-wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
-sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+# === PREVENT INTERACTIVE PROMPTS ===
+export DEBIAN_FRONTEND=noninteractive
 
-# 4. Add the VS Code repository to the system's list
-echo "Adding VS Code repository to system sources..."
-echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" | sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null
+# === STEP 1: INSTALL ESSENTIALS ===
+echo "Step 1: Updating system and installing base tools..."
+apt-get update
+apt-get install -y curl wget git ansible firefox || echo "Warning: Some packages failed."
 
-# 5. Update the package list again to fetch the new repository info
-echo "Updating package list with new repository..."
-sudo apt update
+# === STEP 2: DOCKER INSTALL (RETRY LOGIC) ===
+echo "Step 2: Installing Docker..."
+MAX_RETRIES=3
+COUNT=0
+until [ $COUNT -ge $MAX_RETRIES ]; do
+    curl -fsSL https://get.docker.com -o get-docker.sh && break
+    COUNT=$((COUNT+1))
+    echo "Curl failed, retrying ($COUNT/$MAX_RETRIES)..."
+    sleep 5
+done
 
-# 6. Install Visual Studio Code ('code' package)
-echo "Installing Visual Studio Code..."
-sudo apt install -y code
-
-# 7. Clean up the downloaded GPG key file
-rm packages.microsoft.gpg
-
-# 8. Verify installation
-if command -v code &> /dev/null
-then
-    echo "--- Visual Studio Code installed successfully! ---"
-    echo "You can run it by typing 'code' in your terminal."
+if [ -f get-docker.sh ]; then
+    sh get-docker.sh
 else
-    echo "--- ERROR: VS Code installation may have failed. ---"
+    echo "Critical: Docker script could not be downloaded."
+    exit 1
 fi
+
+# === STEP 3: ANSIBLE PULL ===
+echo "Step 3: Triggering Ansible configuration..."
+ansible-pull -U https://github.com/yourusername/ansible-repo.git \
+             -i localhost, \
+             playbook.yml
+
+echo "=== Deployment Finished Successfully: $(date) ==="
